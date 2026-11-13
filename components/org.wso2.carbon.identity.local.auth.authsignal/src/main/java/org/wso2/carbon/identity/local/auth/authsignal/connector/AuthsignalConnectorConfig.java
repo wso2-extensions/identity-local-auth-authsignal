@@ -35,7 +35,7 @@ import java.util.Properties;
 public class AuthsignalConnectorConfig implements IdentityConnectorConfig {
 
     public static final String[] PROPERTY_NAMES = {ConnectorConfig.SECRET_KEY, ConnectorConfig.REGION,
-            ConnectorConfig.ACTION_CODE, ConnectorConfig.PASSKEY_ENROLLED_CLAIM};
+            ConnectorConfig.ACTION_CODE};
 
     @Override
     public String getName() {
@@ -74,7 +74,6 @@ public class AuthsignalConnectorConfig implements IdentityConnectorConfig {
         nameMapping.put(ConnectorConfig.SECRET_KEY, "Secret key");
         nameMapping.put(ConnectorConfig.REGION, "Region");
         nameMapping.put(ConnectorConfig.ACTION_CODE, "Action code");
-        nameMapping.put(ConnectorConfig.PASSKEY_ENROLLED_CLAIM, "Passkey enrolled claim");
         return nameMapping;
     }
 
@@ -87,10 +86,8 @@ public class AuthsignalConnectorConfig implements IdentityConnectorConfig {
         descriptionMapping.put(ConnectorConfig.REGION,
                 "Region of the Authsignal tenant: us, eu, au, ca or uk");
         descriptionMapping.put(ConnectorConfig.ACTION_CODE,
-                "Action code of the Authsignal flow used");
-        descriptionMapping.put(ConnectorConfig.PASSKEY_ENROLLED_CLAIM,
-                "URI of the local claim set to true or false based on whether the user has a passkey on Authsignal."
-                        + " Leave empty to not update any claim");
+                "Default action code of the Authsignal flow. A flow node or the adaptive authentication script "
+                        + "can override it");
         return descriptionMapping;
     }
 
@@ -107,7 +104,6 @@ public class AuthsignalConnectorConfig implements IdentityConnectorConfig {
         properties.put(ConnectorConfig.SECRET_KEY, "");
         properties.put(ConnectorConfig.REGION, Defaults.REGION);
         properties.put(ConnectorConfig.ACTION_CODE, Defaults.ACTION_CODE);
-        properties.put(ConnectorConfig.PASSKEY_ENROLLED_CLAIM, "");
         return properties;
     }
 

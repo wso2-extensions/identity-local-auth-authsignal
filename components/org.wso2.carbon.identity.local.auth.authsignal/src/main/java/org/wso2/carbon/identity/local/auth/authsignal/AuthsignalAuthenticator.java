@@ -46,6 +46,7 @@ import org.wso2.carbon.identity.local.auth.authsignal.constant.AuthsignalConstan
 import org.wso2.carbon.identity.local.auth.authsignal.constant.AuthsignalConstants.ErrorMessages;
 import org.wso2.carbon.identity.local.auth.authsignal.constant.AuthsignalConstants.LogConstants.Messages;
 import org.wso2.carbon.identity.local.auth.authsignal.constant.AuthsignalConstants.RequestParams;
+import org.wso2.carbon.identity.local.auth.authsignal.constant.AuthsignalConstants.RuntimeParams;
 import org.wso2.carbon.identity.local.auth.authsignal.exception.AuthsignalConnectionException;
 import org.wso2.carbon.identity.local.auth.authsignal.model.AuthsignalConfig;
 import org.wso2.carbon.identity.local.auth.authsignal.model.AuthsignalRequest;
@@ -244,7 +245,7 @@ public class AuthsignalAuthenticator extends AbstractApplicationAuthenticator
                 () -> logInputs(context, user, actionCode));
         // Federated users have no local profile to update.
         if (!user.isFederatedUser() && StringUtils.isNotBlank(user.getUserName())) {
-            AuthsignalUtil.savePasskeyEnrolledClaim(config, user.getTenantDomain(),
+            AuthsignalUtil.savePasskeyManagedExternallyClaim(user.getTenantDomain(),
                     UserCoreUtil.addDomainToName(user.getUserName(), user.getUserStoreDomain()), result.hasPasskey());
         }
         context.setSubject(new AuthenticatedUser(user));
@@ -266,7 +267,7 @@ public class AuthsignalAuthenticator extends AbstractApplicationAuthenticator
         if (!user.isFederatedUser()) {
             completePendingLink(config, user, authsignalUserId, context);
         }
-        String actionCode = config.getActionCode();
+        String actionCode = resolveActionCode(context, config);
 
         AuthsignalRequest startRequest = new AuthsignalRequest(actionCode)
                 .setUserId(authsignalUserId)
@@ -327,7 +328,7 @@ public class AuthsignalAuthenticator extends AbstractApplicationAuthenticator
 
         Map<String, String> claims = new HashMap<>();
         try {
-            claims = AuthsignalUtil.syncUserIdToAuthsignal(createClient(config), config, authsignalUserId, challengeId,
+            claims = AuthsignalUtil.syncUserIdToAuthsignal(createClient(config), authsignalUserId, challengeId,
                     AuthsignalUtil.getUserClaim(tenantDomain, username, AuthsignalConstants.EMAIL_CLAIM),
                     AuthsignalUtil.getUserClaim(tenantDomain, username, AuthsignalConstants.MOBILE_CLAIM));
             if (LOG.isDebugEnabled()) {
@@ -506,5 +507,22 @@ public class AuthsignalAuthenticator extends AbstractApplicationAuthenticator
                                                         Throwable cause) {
 
         return new AuthenticationFailedException(error.getCode(), error.getMessage(), user, cause);
+    }
+
+    /**
+     * Resolves the action code of the Authsignal flow. The action code set from the adaptive authentication script
+     * overrides the one in the connector configuration.
+     *
+     * @param context Authentication context.
+     * @param config  Authsignal configuration of the tenant.
+     * @return Action code.
+     */
+    private String resolveActionCode(AuthenticationContext context, AuthsignalConfig config) {
+
+        String actionCode = getRuntimeParams(context).get(RuntimeParams.ACTION_CODE);
+        if (StringUtils.isNotBlank(actionCode)) {
+            return actionCode.trim();
+        }
+        return config.getActionCode();
     }
 }

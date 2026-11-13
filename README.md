@@ -100,8 +100,7 @@ masks it in responses. Only send the properties you want to change; the others k
 |---|---|---|
 | `__secret__.Authsignal.SecretKey` | – (required) | Authsignal Server API key (Authsignal Portal > Settings > API keys). |
 | `Authsignal.Region` | `us` | Region of the Authsignal tenant: `us`, `eu`, `au`, `ca` or `uk`, which selects the API base URL (`https://api.authsignal.com/v1` or `https://<region>.api.authsignal.com/v1`). Match it to the API Host shown in the Authsignal Portal. Tenants pick a region rather than a URL, so the server only calls Authsignal's own hosts. |
-| `Authsignal.ActionCode` | `sign-in` | Action code of the Authsignal flow used at sign-in and in all registration, invited-user registration and password recovery flows. |
-| `Authsignal.PasskeyEnrolledClaim` | _(empty)_ | URI of the local claim set to whether the user has a passkey on Authsignal, for example `http://wso2.org/claims/authsignalPasskeyEnrolled`. Not updated when empty. See [Passkey enrolled claim](#passkey-enrolled-claim). |
+| `Authsignal.ActionCode` | `sign-in` | Default action code of the Authsignal flow, used at sign-in and in all registration, invited-user registration and password recovery flows. A flow node ([Setup](#setup)) or the adaptive authentication script ([Action code from the script](#action-code-from-the-script)) can override it. |
 
 Each Authsignal API call has a fixed 10 second timeout. It is not configurable, so that one tenant cannot hold server
 threads for long periods.
@@ -110,6 +109,28 @@ Calls go through the identity server's shared external API client. A call that f
 on a dropped connection or a timeout, is retried. The retry count, connection pool size and connections per route are
 the server-wide `[external_api_client]` settings in `deployment.toml`. Calls that get an HTTP error status are not
 retried.
+
+### Action code from the script
+
+The adaptive authentication script of an application can set the action code of the sign-in flow, overriding
+`Authsignal.ActionCode`. For example, to use the `step-up` flow for administrators:
+
+```js
+var onLoginRequest = function (context) {
+    executeStep(1, {
+        onSuccess: function (context) {
+            var isAdmin = hasAnyOfTheRoles(context.currentKnownSubject, ["admin"]);
+            executeStep(2, {
+                authenticatorParams: {
+                    local: {
+                        "authsignal-authenticator": { actionCode: isAdmin ? "step-up" : "sign-in" }
+                    }
+                }
+            }, {});
+        }
+    });
+};
+```
 
 ### App-native (API-based) authentication
 
@@ -187,8 +208,9 @@ succeeds, the listener sets the email verified claim to `true` if the user has a
 authenticator with the same email address as the user's own, and the phone verified claim to `true` if the user has an
 `SMS` or `WHATSAPP` authenticator with the same mobile number as the user's own. If the response has
 `action.completedSteps[]`, only the authenticators used in those steps (matched by `userAuthenticatorId`) are
-considered; Identify User returns none, so all the user's authenticators of those methods are considered. The passkey
-enrolled claim is set the same way, from `PASSKEY` authenticators. The email address and mobile number are never copied
+considered; Identify User returns none, so all the user's authenticators of those methods are considered. The
+[passkey managed externally claim](#passkey-managed-externally-claim) is set the same way, from `PASSKEY`
+authenticators. The email address and mobile number are never copied
 from Authsignal. If the registration is pending approval, the user is not created when the flow completes and is not
 linked.
 
@@ -206,16 +228,16 @@ sign-in, before redirecting to Authsignal, `AuthsignalAuthenticator` reads the c
 Authsignal keeps a challenge valid for 10 minutes by default (configurable in Authsignal). Add the claim to the local
 claim dialect as hidden and read-only, so it is not shown or editable in the Console or My Account.
 
-### Passkey enrolled claim
+### Passkey managed externally claim
 
-When `Authsignal.PasskeyEnrolledClaim` is set for a tenant, whenever an Authsignal flow succeeds the claim with that
-URI (for example `http://wso2.org/claims/authsignalPasskeyEnrolled`) is set to `true` if the user has a passkey on Authsignal (a `PASSKEY` authenticator on the user, or a `PASSKEY` step
+Whenever an Authsignal flow succeeds, the identity claim `http://wso2.org/claims/identity/passkeyManagedExternally` is
+set to `true` if the user has a passkey on Authsignal (a `PASSKEY` authenticator on the user, or a `PASSKEY` step
 completed in the flow, such as one enrolled in it), and to `false` otherwise. In registration the claim is saved with
 the verified contact details once the user is linked; in the other flows the executor saves it right after the
 verification. The `AuthsignalAuthenticator` saves it the same way after every successful sign-in flow, so a passkey
 enrolled or removed on Authsignal is reflected on the next login (federated users, who have no local profile, are
-skipped). Add the claim to the local claim dialect first. When the property is empty (the default), no claim is
-updated. A failure to save it is logged and does not fail the flow or the login.
+skipped). The claim is part of the identity server's default local claims. A failure to save it is logged and does not
+fail the flow or the login.
 
 ### Round trip
 
